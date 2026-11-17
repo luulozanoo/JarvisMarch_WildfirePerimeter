@@ -144,7 +144,7 @@ Se abrirá en el navegador (por defecto en `http://localhost:8501`).
 
 ## 👥 Autoría
 
-**Jorge Ois de Pascual**
-**Gonzalo Velasco Lucas**
-**Lucía Lozano Isac**
+**Jorge Ois de Pascual**  
+**Gonzalo Velasco Lucas**  
+**Lucía Lozano Isac**  
 - Estudiantes de Ingeniería Matemáticas e Inteligencia Artificial
