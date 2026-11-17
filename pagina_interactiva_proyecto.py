@@ -154,7 +154,7 @@ with st.sidebar:
 
     # Selector de página/sección
     pagina = st.selectbox(
-        "Información",
+        "Páginas disponibles",
         ["🏡 Inicio","🗺️ Escenario", "💥 Algoritmo", "🛠️ Consecuencias", "📈 Evolución", "📊 Análisis"]
     )
 
@@ -210,7 +210,7 @@ elif pagina in ["🗺️ Escenario", "💥 Algoritmo", "🛠️ Consecuencias"]:
     if "p" not in st.session_state:
         st.info("👈 Configura los parámetros en el menú lateral y haz clic en 'Ejecutar Algoritmo' para empezar.")
     else:
-        # 1. Recuperar variables comunes
+        # Recuperar variables comunes
         p = st.session_state["p"]
         CH = st.session_state["CH"]
         dist_usada, n_usado = st.session_state["params"]
@@ -218,7 +218,7 @@ elif pagina in ["🗺️ Escenario", "💥 Algoritmo", "🛠️ Consecuencias"]:
         tiempo_ms = st.session_state["tiempo_ms"]
         semilla_usada = st.session_state["semilla"]
 
-        # 2. UI específica de cada página antes del mapa
+        # Específicos de cada página antes del mapa
         if pagina == "💥 Algoritmo":
             pasos = st.slider("Pasos algoritmo Jarvis", min_value=1, max_value=len(CH), value=1)
         elif pagina == "🛠️ Consecuencias":
@@ -231,7 +231,7 @@ elif pagina in ["🗺️ Escenario", "💥 Algoritmo", "🛠️ Consecuencias"]:
         st.caption(f"Mostrando: {n_usado} puntos, distribución {dist_usada}, zona de {rang_incendio}x{rang_incendio} km{texto_semilla}")
         st.divider()
 
-        # 3. Gráfica Base (Común)
+        # Gráfica Base (Común)
         fig = go.Figure()
 
         x_puntos = [punto[0]*rang_incendio for punto in p]
