@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+
 
 
 def angulo(u, v):
@@ -31,14 +31,6 @@ def Ymin(p):
 
     return p_select
 
-
-# In[ ]:
-
-
-
-
-
-# In[ ]:
 
 
 def Jarvis(S):
