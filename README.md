@@ -35,10 +35,9 @@ La marcha de Jarvis construye la envolvente "envolviendo" la nube de puntos, com
 
 **Complejidad:**
 
-| Versión | Coste |
-|---|---|
+
 | Jarvis clásico (busca el punto más extremo en cada paso) | O(n · h) |
-| Esta implementación (ordena todos los puntos en cada vértice) | O(h · n log n) |
+
 
 Donde `n` es el número de focos y `h` el número de vértices de la envolvente. En el mejor caso (pocos vértices, como en un incendio compacto) el algoritmo es rápido. En el peor caso, cuando casi todos los puntos están en la envolvente (`h ≈ n`), el coste crece mucho. La distribución **Anillo** reproduce justo ese caso.
 
