@@ -53,16 +53,25 @@ def Ymin(p):
 
 
 def Jarvis(S):
-    minimo = Ymin(S)
+    # Eliminar duplicados exactos conservando orden
+    puntos_unicos = []
+    for pt in S:
+        if not any(abs(pt[0]-u[0]) < 1e-9 and abs(pt[1]-u[1]) < 1e-9 for u in puntos_unicos):
+            puntos_unicos.append(pt)
+    if len(puntos_unicos) < 3:
+        return puntos_unicos
+
+    minimo = Ymin(puntos_unicos)
     envolvente = [minimo]
     i = 1
-    while True:
+    max_iter = len(puntos_unicos) + 5
+    while i < max_iter:
         if i == 1:
             d = (1, 0)
         else:
             d = (envolvente[i-1][0]-envolvente[i-2][0], envolvente[i-1][1]-envolvente[i-2][1])
-        minimo_angular = minimoAngular(S, envolvente[i-1], d)
-        if minimo_angular == minimo:
+        minimo_angular = minimoAngular(puntos_unicos, envolvente[i-1], d)
+        if minimo_angular is None or minimo_angular == minimo:
             break
         envolvente.append(minimo_angular)
         i += 1
@@ -162,6 +171,79 @@ PUEBLOS = [
     {"nombre": "Villa Alta", "coords": [0.50, 0.85]},
     {"nombre": "El Puente", "coords": [0.70, 0.50]}
 ]
+
+def simular_propagacion(p_inicial, num_turnos, dir_viento_rad, fuerza_viento, tasa_expansion, semilla, rang_incendio):
+    """Simula la propagación estocástica del incendio por turnos temporales."""
+    rng = random.Random(semilla if semilla != 0 else 42)
+
+    vx_viento = fuerza_viento * math.cos(dir_viento_rad) if dir_viento_rad is not None else 0.0
+    vy_viento = fuerza_viento * math.sin(dir_viento_rad) if dir_viento_rad is not None else 0.0
+
+    historial = []
+
+    # Turno 0: Focos iniciales
+    puntos_actuales = [list(pt) for pt in p_inicial]
+    ch_0 = Jarvis(puntos_actuales)
+    ha_0, per_0 = calcular_area_perimetro(ch_0, rang_incendio)
+    pueblos_0 = [p["nombre"] for p in PUEBLOS if punto_en_poligono(p["coords"], ch_0)]
+
+    historial.append({
+        "turno": 0,
+        "focos_acumulados": [list(pt) for pt in puntos_actuales],
+        "focos_nuevos": [list(pt) for pt in puntos_actuales],
+        "CH": ch_0,
+        "hectareas": ha_0,
+        "perimetro_km": per_0,
+        "nuevas_hectareas": ha_0,
+        "pueblos_afectados": pueblos_0
+    })
+
+    factor_hijos = 1 if tasa_expansion == "Lenta" else (2 if tasa_expansion == "Moderada" else 3)
+
+    for t in range(1, num_turnos + 1):
+        frentes = historial[-1]["CH"] if len(historial[-1]["CH"]) > 0 else puntos_actuales
+        otros = historial[-1]["focos_acumulados"]
+
+        # Priorizamos propagación desde el perímetro (frente de fuego)
+        candidatos = frentes + (rng.sample(otros, min(len(otros), max(3, len(frentes)))) if otros else [])
+        nuevos_de_este_turno = []
+
+        for pt in candidatos:
+            num_hijos = rng.randint(1, factor_hijos)
+            for _ in range(num_hijos):
+                # Dispersión aleatoria radial con deriva de viento
+                dist = rng.uniform(0.015, 0.045)
+                ang = rng.uniform(0, 2 * math.pi)
+                dx = dist * math.cos(ang) + vx_viento * 0.03
+                dy = dist * math.sin(ang) + vy_viento * 0.03
+
+                # Salto de pavesa (foco secundario arrojado por el viento)
+                if rng.random() < 0.15 and fuerza_viento > 0:
+                    dx += vx_viento * rng.uniform(0.04, 0.09)
+                    dy += vy_viento * rng.uniform(0.04, 0.09)
+
+                nx = max(0.0, min(1.0, pt[0] + dx))
+                ny = max(0.0, min(1.0, pt[1] + dy))
+                nuevos_de_este_turno.append([round(nx, 4), round(ny, 4)])
+
+        puntos_actuales.extend(nuevos_de_este_turno)
+        ch_t = Jarvis(puntos_actuales)
+        ha_t, per_t = calcular_area_perimetro(ch_t, rang_incendio)
+        delta_ha = max(0.0, ha_t - historial[-1]["hectareas"])
+        pueblos_t = [p["nombre"] for p in PUEBLOS if punto_en_poligono(p["coords"], ch_t)]
+
+        historial.append({
+            "turno": t,
+            "focos_acumulados": [list(pt) for pt in puntos_actuales],
+            "focos_nuevos": nuevos_de_este_turno,
+            "CH": ch_t,
+            "hectareas": ha_t,
+            "perimetro_km": per_t,
+            "nuevas_hectareas": delta_ha,
+            "pueblos_afectados": pueblos_t
+        })
+
+    return historial
 
 #########################
 ## IMAGEN DE FONDO
@@ -455,7 +537,248 @@ elif pagina in ["🗺️ Escenario", "💥 Algoritmo", "🛠️ Consecuencias"]:
             st.info("✅ **Simulación completada.** Puedes volver al menú lateral, cambiar el tipo de incendio o el número de focos, y pulsar de nuevo 'Ejecutar Algoritmo' para generar un escenario totalmente distinto.")
 
 
-# Resto de páginas (Placeholders)
-elif pagina in ["📈 Evolución"]:
-    st.subheader(pagina[2:])
-    st.write("Esta sección está en construcción.")
+# Resto de páginas
+elif pagina == "📈 Evolución":
+    if "p" not in st.session_state:
+        st.info("👈 Configura los parámetros en el menú lateral y haz clic en '🚀 Ejecutar Algoritmo' para empezar la simulación.")
+    else:
+        # Recuperar variables comunes de la sesión
+        p = st.session_state["p"]
+        dist_usada, n_usado = st.session_state["params"]
+        rang_incendio = st.session_state["rango_incendio"]
+        semilla_usada = st.session_state["semilla"]
+
+        st.markdown("### 📈 Propagación Dinámica del Incendio (Evolución Temporal)")
+        st.write(
+            "En un incendio real, el avance del fuego es un fenómeno **dinámico y estocástico**. "
+            "A medida que pasan las horas (turnos), los focos perimetrales activos generan nuevos frentes de llama "
+            "y las pavesas arrastradas por el viento provocan saltos de fuego a favor de la corriente. "
+            "En esta sección puedes simular cómo la **envolvente convexa de Jarvis** evoluciona y se expande turno a turno."
+        )
+
+        with st.expander("⚙️ Parámetros de Propagación del Viento y Terreno", expanded=True):
+            col_v1, col_v2, col_v3 = st.columns(3)
+            with col_v1:
+                dir_viento_opciones = {
+                    "Sin viento (Calma)": None,
+                    "Noreste ↗ (45°)": math.pi / 4,
+                    "Norte ↑ (90°)": math.pi / 2,
+                    "Noroeste ↖ (135°)": 3 * math.pi / 4,
+                    "Oeste ← (180°)": math.pi,
+                    "Suroeste ↙ (225°)": -3 * math.pi / 4,
+                    "Sur ↓ (270°)": -math.pi / 2,
+                    "Sureste ↘ (315°)": -math.pi / 4,
+                    "Este → (0°)": 0.0,
+                }
+                dir_viento_label = st.selectbox("Dirección del Viento", list(dir_viento_opciones.keys()), index=1)
+                dir_viento_rad = dir_viento_opciones[dir_viento_label]
+
+            with col_v2:
+                fuerza_viento_opciones = {
+                    "Calma (0 km/h)": 0.0,
+                    "Brisa moderada (15 km/h)": 0.8,
+                    "Viento fuerte (35 km/h)": 1.6,
+                    "Rachas extremas (60 km/h)": 2.5
+                }
+                fuerza_viento_label = st.selectbox("Intensidad del Viento", list(fuerza_viento_opciones.keys()), index=2)
+                fuerza_viento_val = fuerza_viento_opciones[fuerza_viento_label]
+
+            with col_v3:
+                num_turnos = st.slider("Horas / Turnos a simular", min_value=2, max_value=8, value=5)
+
+            col_sub1, col_sub2 = st.columns(2)
+            with col_sub1:
+                tasa_exp = st.select_slider("Tasa de propagación del frente", options=["Lenta", "Moderada", "Rápida"], value="Moderada")
+            with col_sub2:
+                origen_sim = st.radio(
+                    "Punto de partida de la propagación:",
+                    ["Núcleo inicial de ignición (Centro)", "Focos actuales del escenario"],
+                    horizontal=True
+                )
+
+        # Selección de focos de partida
+        if origen_sim == "Núcleo inicial de ignición (Centro)":
+            cx = sum(pt[0] for pt in p) / len(p)
+            cy = sum(pt[1] for pt in p) / len(p)
+            p_ordenados = sorted(p, key=lambda pt: (pt[0]-cx)**2 + (pt[1]-cy)**2)
+            p_inicio_sim = p_ordenados[:max(4, min(8, len(p)))]
+        else:
+            p_inicio_sim = p[:min(len(p), 40)]
+
+        # Simular propagación temporal
+        semilla_sim = (semilla_usada + 101) if semilla_usada != 0 else 42
+        historial_sim = simular_propagacion(
+            p_inicio_sim,
+            num_turnos,
+            dir_viento_rad,
+            fuerza_viento_val,
+            tasa_exp,
+            semilla_sim,
+            rang_incendio
+        )
+
+        st.divider()
+
+        # Selector interactivo de turno temporal
+        turno_sel = st.slider(
+            "⏱️ Línea temporal: Selecciona el Turno / Hora para ver la propagación",
+            min_value=0,
+            max_value=num_turnos,
+            value=num_turnos,
+            help="Desplaza el slider para visualizar la expansión del fuego paso a paso"
+        )
+
+        datos_turno = historial_sim[turno_sel]
+        ch_turno = datos_turno["CH"]
+        focos_acum = datos_turno["focos_acumulados"]
+        focos_nuevos = datos_turno["focos_nuevos"]
+
+        # Evacuaciones y alertas de este turno
+        pueblos_evac = datos_turno["pueblos_afectados"]
+        pueblos_turno_anterior = historial_sim[turno_sel - 1]["pueblos_afectados"] if turno_sel > 0 else []
+        pueblos_nuevos_ahora = [pb for pb in pueblos_evac if pb not in pueblos_turno_anterior]
+
+        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+        col_m1.metric("⏱️ Turno Evaluado", f"Hora +{turno_sel}")
+        col_m2.metric("🔵 Focos Totales", f"{len(focos_acum)}", f"+{len(focos_nuevos)} nuevos" if turno_sel > 0 else None)
+        col_m3.metric("🔥 Área Calcinada", f"{datos_turno['hectareas']:.1f} ha", f"+{datos_turno['nuevas_hectareas']:.1f} ha/h" if turno_sel > 0 else None)
+        col_m4.metric(
+            "🏘️ Pueblos Evacuados",
+            f"{len(pueblos_evac)} de {len(PUEBLOS)}",
+            delta=f"🚨 +{len(pueblos_nuevos_ahora)} nuevo(s)" if len(pueblos_nuevos_ahora) > 0 else None,
+            delta_color="inverse"
+        )
+
+        # Mapa interactivo de la simulación
+        fig_sim = go.Figure()
+
+        # 1. Anillos / Isolíneas de perímetros anteriores
+        for t_ant in range(turno_sel):
+            ch_ant = historial_sim[t_ant]["CH"]
+            if len(ch_ant) >= 3:
+                x_ant = [pt[0]*rang_incendio for pt in ch_ant] + [ch_ant[0][0]*rang_incendio]
+                y_ant = [pt[1]*rang_incendio for pt in ch_ant] + [ch_ant[0][1]*rang_incendio]
+                fig_sim.add_trace(go.Scatter(
+                    x=x_ant, y=y_ant, mode='lines',
+                    line=dict(color="rgba(110, 110, 110, 0.45)", width=1.5, dash='dot'),
+                    name=f"Perímetro Turno {t_ant}",
+                    hoverinfo="skip",
+                    showlegend=(t_ant == 0)
+                ))
+
+        # 2. Focos antiguos (brasas previas)
+        if turno_sel > 0:
+            focos_previos = historial_sim[turno_sel - 1]["focos_acumulados"]
+            fig_sim.add_trace(go.Scatter(
+                x=[pt[0]*rang_incendio for pt in focos_previos],
+                y=[pt[1]*rang_incendio for pt in focos_previos],
+                mode='markers', name='Focos previos (brasas)',
+                marker=dict(color="#B22222", size=6, opacity=0.45),
+                hovertemplate="Foco activo previo<br>Este: %{x:.2f} km<br>Norte: %{y:.2f} km<extra></extra>"
+            ))
+
+        # 3. Focos nuevos de este turno
+        fig_sim.add_trace(go.Scatter(
+            x=[pt[0]*rang_incendio for pt in focos_nuevos],
+            y=[pt[1]*rang_incendio for pt in focos_nuevos],
+            mode='markers', name=f'Nuevos focos (Turno {turno_sel})',
+            marker=dict(color="#FFD700", size=9, line=dict(color="#D50000", width=1.5)),
+            hovertemplate="Nuevo foco activo<br>Este: %{x:.2f} km<br>Norte: %{y:.2f} km<extra></extra>"
+        ))
+
+        # 4. Envolvente convexa actual de este turno
+        if len(ch_turno) >= 3:
+            x_env = [pt[0]*rang_incendio for pt in ch_turno] + [ch_turno[0][0]*rang_incendio]
+            y_env = [pt[1]*rang_incendio for pt in ch_turno] + [ch_turno[0][1]*rang_incendio]
+            fig_sim.add_trace(go.Scatter(
+                x=x_env, y=y_env, mode='lines+markers', name=f'Perímetro Jarvis (t={turno_sel})',
+                line=dict(color="#062003", width=3),
+                marker=dict(color="#062003", size=9, symbol='diamond'),
+                fill='toself', fillcolor='rgba(255, 69, 0, 0.28)',
+                hovertemplate="Vértice Este: %{x:.2f} km<br>Vértice Norte: %{y:.2f} km<extra></extra>"
+            ))
+
+        # 5. Pueblos y estado de evacuación en este turno
+        for pueblo in PUEBLOS:
+            afectado = punto_en_poligono(pueblo["coords"], ch_turno)
+            color = "#FF0000" if afectado else "#0000FF"
+            simbolo = "x-open" if afectado else "pentagon"
+            estado = "EVACUAR" if afectado else "A salvo"
+            fig_sim.add_trace(go.Scatter(
+                x=[pueblo["coords"][0] * rang_incendio],
+                y=[pueblo["coords"][1] * rang_incendio],
+                mode='markers+text', name=f'{pueblo["nombre"]} ({estado})',
+                text=[pueblo["nombre"]], textposition="top center",
+                marker=dict(color=color, size=14, symbol=simbolo, line=dict(color='white', width=1)),
+                hovertemplate=f"<b>{pueblo['nombre']}</b><br>Estado en t={turno_sel}: {estado}<extra></extra>"
+            ))
+
+        # Ajuste de layout con imagen de fondo si existe
+        margen = rang_incendio * 0.05
+        img_fondo = cargar_fondo()
+        if img_fondo is not None:
+            fig_sim.add_layout_image(dict(
+                source=img_fondo, xref="x", yref="y", x=-margen, y=-margen,
+                sizex=rang_incendio + 2 * margen, sizey=rang_incendio + 2 * margen,
+                xanchor="left", yanchor="bottom", sizing="stretch", opacity=1, layer="below"
+            ))
+
+        fig_sim.update_layout(
+            height=650, hovermode="closest", plot_bgcolor="rgba(0,0,0,0)",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            xaxis=dict(title="Este-Oeste (km)", showgrid=True, gridcolor='rgba(200,200,200,0.3)', zeroline=False, range=[-margen, rang_incendio + margen], constrain="domain"),
+            yaxis=dict(title="Norte-Sur (km)", showgrid=True, gridcolor='rgba(200,200,200,0.3)', zeroline=False, range=[-margen, rang_incendio + margen], constrain="domain", scaleanchor="x", scaleratio=1),
+            margin=dict(l=0, r=0, t=30, b=0)
+        )
+
+        st.plotly_chart(fig_sim, use_container_width=True)
+
+        # Gráficas de análisis temporal
+        st.subheader("📊 Métricas de Propagación en el Tiempo")
+        col_g1, col_g2 = st.columns(2)
+
+        turnos_x = [h["turno"] for h in historial_sim]
+        areas_y = [h["hectareas"] for h in historial_sim]
+        deltas_y = [h["nuevas_hectareas"] for h in historial_sim]
+
+        with col_g1:
+            fig_area = go.Figure()
+            fig_area.add_trace(go.Scatter(
+                x=turnos_x, y=areas_y, mode='lines+markers',
+                line=dict(color="#FF4500", width=3),
+                marker=dict(size=8),
+                name="Área acumulada"
+            ))
+            fig_area.add_trace(go.Scatter(
+                x=[turno_sel], y=[areas_y[turno_sel]], mode='markers',
+                marker=dict(color="#FFD700", size=14, symbol='star', line=dict(color='black', width=2)),
+                name="Turno actual"
+            ))
+            fig_area.update_layout(
+                title="Área Total Afectada (ha) vs Tiempo",
+                xaxis_title="Turno (Horas)", yaxis_title="Hectáreas (ha)",
+                height=320, margin=dict(l=30, r=20, t=40, b=30)
+            )
+            st.plotly_chart(fig_area, use_container_width=True)
+
+        with col_g2:
+            fig_delta = go.Figure()
+            fig_delta.add_trace(go.Bar(
+                x=turnos_x[1:] if len(turnos_x) > 1 else [0],
+                y=deltas_y[1:] if len(deltas_y) > 1 else [0],
+                marker_color="#FF8C00",
+                name="Velocidad (ha/turno)"
+            ))
+            fig_delta.update_layout(
+                title="Velocidad de Expansión (ha ganadas por turno)",
+                xaxis_title="Turno (Horas)", yaxis_title="Δ Hectáreas / hora",
+                height=320, margin=dict(l=30, r=20, t=40, b=30)
+            )
+            st.plotly_chart(fig_delta, use_container_width=True)
+
+        with st.expander("📖 Interpretación Geométrica de la Propagación"):
+            st.markdown(
+                "1. **Anisotropía por viento:** Cuando la fuerza del viento es notable, los focos y la envolvente convexa se elongan en la dirección de sotavento, modelando una elipse de propagación.\n"
+                "2. **Saltos de pavesas:** Focos que saltan por delante del frente crean nuevos vértices extremos en la envolvente, provocando saltos bruscos en el área contenida.\n"
+                "3. **Planificación de emergencias:** Conocer la velocidad de avance ($\Delta \text{Área}/\Delta t$) y la dirección permite anticipar con qué margen de tiempo ordenar la evacuación de las poblaciones en la trayectoria."
+            )

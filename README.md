@@ -85,6 +85,12 @@ pip install streamlit plotly pillow
 streamlit run pagina_interactiva_proyecto.py
 ```
 
+> 💡 **Nota (si `streamlit` no se reconoce como comando en Windows/PowerShell):**  
+> Puedes ejecutarlo directamente a través del módulo de Python:  
+> ```bash
+> python -m streamlit run pagina_interactiva_proyecto.py
+> ```
+
 Se abrirá en el navegador (por defecto en `http://localhost:8501`).
 
 ### Cómo usarla
@@ -122,10 +128,10 @@ Se abrirá en el navegador (por defecto en `http://localhost:8501`).
 - [x] Marcha de Jarvis implementada desde cero
 - [x] Mapa interactivo con escala en kilómetros
 - [x] Visualización paso a paso de la envolvente
-- [ ] Área en hectáreas y perímetro en kilómetros
-- [ ] Poblaciones con aviso de evacuación y margen de seguridad
+- [x] Área en hectáreas y perímetro en kilómetros
+- [x] Poblaciones con aviso de evacuación y margen de seguridad
+- [x] Evolución temporal del incendio y velocidad de propagación
 - [ ] Paso a paso con explicación y candidatos evaluados
-- [ ] Evolución temporal del incendio y velocidad de propagación
 - [ ] Análisis de tiempos (mejor y peor caso, comparación con otras implementaciones)
 - [ ] Agrupar focos para calcular una envolvente por incendio
 - [ ] Contornos no convexos como alternativa (*alpha shapes*)
