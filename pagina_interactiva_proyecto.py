@@ -185,7 +185,7 @@ with st.sidebar:
 
     pagina = st.selectbox(
         "Páginas disponibles",
-        ["🏡 Inicio","🗺️ Escenario", "💥 Algoritmo", "🛠️ Consecuencias", "📈 Evolución", "📊 Análisis"]
+        ["🏡 Inicio","🗺️ Escenario", "💥 Algoritmo", "🛠️ Consecuencias", "📈 Evolución"]
     )
 
     st.divider()
@@ -456,6 +456,6 @@ elif pagina in ["🗺️ Escenario", "💥 Algoritmo", "🛠️ Consecuencias"]:
 
 
 # Resto de páginas (Placeholders)
-elif pagina in ["📈 Evolución", "📊 Análisis"]:
+elif pagina in ["📈 Evolución"]:
     st.subheader(pagina[2:])
     st.write("Esta sección está en construcción.")
