@@ -118,6 +118,7 @@ Se abrirá en el navegador (por defecto en `http://localhost:8501`).
 .
 ├── pagina_interactiva_proyecto.py   # Aplicación Streamlit (Jarvis, generador, impacto, evolución y UI)
 ├── mapa_bosque.jpeg                 # Imagen de fondo del mapa (opcional)
+├── Jarvis.py                        # Algoritmo base del código                
 └── README.md
 ```
 
